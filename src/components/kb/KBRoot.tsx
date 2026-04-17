@@ -14,10 +14,8 @@ import type { KBFolder, KBArticle } from '@/types';
 import {
   getRootCategories,
   getAllArticlesInCategory,
-  getArticleCount,
   getUnitPath,
   flattenUnits,
-  unitTree,
   getUnit,
 } from '@/data/mock-data';
 import { ArticleCard, ArticleRow } from './ArticleCard';

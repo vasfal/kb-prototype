@@ -25,7 +25,7 @@ export function AppShell() {
   const [selectedUnitId, setSelectedUnitId] = useState(defaultSelectedUnitId);
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
-  const [localArticles, setLocalArticles] = useState<KBArticle[]>([]);
+  const [, setLocalArticles] = useState<KBArticle[]>([]);
 
   const unitPath = getUnitPath(selectedUnitId).map((u) => u.name);
 
