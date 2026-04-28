@@ -22,7 +22,6 @@ import {
   Redo,
   ChevronDown,
   Eye,
-  Globe,
   Lock,
   Building2,
 } from 'lucide-react';
@@ -39,7 +38,6 @@ interface ArticleEditorProps {
 
 const visibilityOptions: { value: Visibility; label: string; icon: React.ReactNode }[] = [
   { value: 'unit_and_subunits', label: 'Unit & sub-units', icon: <Building2 className="w-4 h-4" /> },
-  { value: 'all_units', label: 'All units', icon: <Globe className="w-4 h-4" /> },
   { value: 'current_unit_only', label: 'Current unit only', icon: <Lock className="w-4 h-4" /> },
 ];
 
@@ -189,7 +187,9 @@ export function ArticleEditor({ article, unitId, onSave, onClose }: ArticleEdito
 
   const [title, setTitle] = useState(article?.title ?? '');
   const [folderId, setFolderId] = useState(article?.folderId ?? categories[0]?.id ?? '');
-  const [visibility, setVisibility] = useState<Visibility>(article?.visibility ?? 'unit_and_subunits');
+  const [visibility, setVisibility] = useState<Visibility>(
+    article?.visibility === 'current_unit_only' ? 'current_unit_only' : 'unit_and_subunits',
+  );
   const [visibilityOpen, setVisibilityOpen] = useState(false);
 
   const editor = useEditor({
