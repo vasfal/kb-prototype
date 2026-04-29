@@ -14,15 +14,21 @@ import type { KBFolder, KBArticle } from '@/types';
 import {
   getRootCategories,
   getAllArticlesInCategory,
+  getArticlesInFolder,
+  getChildFolders,
+  getFolder,
   getUnitPath,
   flattenUnits,
   getUnit,
 } from '@/data/mock-data';
 import { ArticleCard, ArticleRow } from './ArticleCard';
 import { EmptyState } from './EmptyState';
+import { KBSidebar, type SidebarSelection } from './KBSidebar';
 
 interface KBRootProps {
   unitId: string;
+  /** Bumped on every mock-data mutation to force re-render of helper-based reads. */
+  dataVersion?: number;
   onArticleClick?: (article: KBArticle) => void;
   onCreateArticle?: () => void;
 }
@@ -50,20 +56,11 @@ function sortArticlesByUnitProximity(articles: KBArticle[], currentUnitId: strin
   return [...articles].sort((a, b) => rank(a.unitId) - rank(b.unitId));
 }
 
-interface CategorySectionProps {
-  category: KBFolder;
-  collapsed: boolean;
-  onToggle: () => void;
-  viewMode: 'grid' | 'list';
-  unitId: string;
-  showSubUnits: boolean;
-  onArticleClick?: (article: KBArticle) => void;
-}
-
-function CategorySection({ category, collapsed, onToggle, viewMode, unitId, showSubUnits, onArticleClick }: CategorySectionProps) {
-  const allArticles = getAllArticlesInCategory(category.id);
-
-  // Filter by unit context
+function filterArticlesForUnit(
+  articles: KBArticle[],
+  unitId: string,
+  showSubUnits: boolean,
+): KBArticle[] {
   const path = getUnitPath(unitId);
   const parentIds = new Set(path.slice(0, -1).map((u) => u.id));
   const currentUnit = getUnit(unitId);
@@ -73,21 +70,123 @@ function CategorySection({ category, collapsed, onToggle, viewMode, unitId, show
       if (u.id !== unitId) subUnitIds.add(u.id);
     });
   }
-
-  const articles = sortArticlesByUnitProximity(
-    allArticles.filter((a) => {
+  return sortArticlesByUnitProximity(
+    articles.filter((a) => {
       if (parentIds.has(a.unitId)) return true;
       if (a.unitId === unitId) return true;
       if (showSubUnits && subUnitIds.has(a.unitId)) return true;
       return false;
     }),
-    unitId
+    unitId,
   );
+}
 
+interface ArticleListProps {
+  articles: KBArticle[];
+  viewMode: 'grid' | 'list';
+  onArticleClick?: (article: KBArticle) => void;
+}
+
+function ArticleList({ articles, viewMode, onArticleClick }: ArticleListProps) {
+  if (viewMode === 'grid') {
+    return (
+      <div className="grid grid-cols-3 gap-3 pb-4 px-4">
+        {articles.map((article) => (
+          <ArticleCard key={article.id} article={article} onClick={() => onArticleClick?.(article)} />
+        ))}
+      </div>
+    );
+  }
+  return (
+    <table className="w-full table-fixed">
+      <thead>
+        <tr className="border-y border-[#edeff3] bg-[#fafbfc]">
+          <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 pl-4">Article</th>
+          <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[160px]">Unit</th>
+          <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[100px]">Status</th>
+          <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[90px]">Updated</th>
+          <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[180px]">Owner</th>
+          <th className="w-[40px] py-1.5 pr-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {articles.map((article) => (
+          <ArticleRow key={article.id} article={article} onClick={() => onArticleClick?.(article)} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+interface SubCategorySectionProps {
+  category: KBFolder;
+  articles: KBArticle[];
+  collapsed: boolean;
+  onToggle: () => void;
+  viewMode: 'grid' | 'list';
+  onArticleClick?: (article: KBArticle) => void;
+}
+
+function SubCategorySection({ category, articles, collapsed, onToggle, viewMode, onArticleClick }: SubCategorySectionProps) {
+  const [iconHovered, setIconHovered] = useState(false);
   const count = articles.filter((a) => a.status !== 'archived').length;
+
+  return (
+    <div className="flex flex-col border-t border-[#edeff3]">
+      <div className="flex items-center gap-2 cursor-pointer select-none px-4 pt-3 pb-2.5" onClick={onToggle}>
+        <div
+          className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+          style={{ backgroundColor: category.color }}
+          onMouseEnter={() => setIconHovered(true)}
+          onMouseLeave={() => setIconHovered(false)}
+        >
+          {iconHovered ? (
+            collapsed ? (
+              <ChevronRight className="w-3.5 h-3.5 text-white" />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5 text-white" />
+            )
+          ) : (
+            <BookOpen className="w-3.5 h-3.5 text-white" />
+          )}
+        </div>
+        <h3 className="text-[14px] font-medium text-[#1f242e] leading-[20px]">
+          {category.name}
+        </h3>
+        <span className="inline-flex items-center justify-center px-1.5 py-0.5 text-[12px] font-medium text-[#525f7a] bg-white border border-[#e0e4eb] rounded-lg min-w-[24px] text-center leading-[16px]">
+          {count}
+        </span>
+      </div>
+
+      {!collapsed && <ArticleList articles={articles} viewMode={viewMode} onArticleClick={onArticleClick} />}
+    </div>
+  );
+}
+
+interface CategorySectionProps {
+  category: KBFolder;
+  collapsed: boolean;
+  onToggle: () => void;
+  collapsedIds: Set<string>;
+  onToggleId: (id: string) => void;
+  viewMode: 'grid' | 'list';
+  unitId: string;
+  showSubUnits: boolean;
+  onArticleClick?: (article: KBArticle) => void;
+}
+
+function CategorySection({ category, collapsed, onToggle, collapsedIds, onToggleId, viewMode, unitId, showSubUnits, onArticleClick }: CategorySectionProps) {
+  const directArticles = filterArticlesForUnit(getArticlesInFolder(category.id), unitId, showSubUnits);
+  const subCategories = getChildFolders(category.id).sort((a, b) => a.sortOrder - b.sortOrder);
+  const subSections = subCategories
+    .map((sub) => ({ category: sub, articles: filterArticlesForUnit(getArticlesInFolder(sub.id), unitId, showSubUnits) }))
+    .filter((s) => s.articles.length > 0);
+
+  const totalArticles = filterArticlesForUnit(getAllArticlesInCategory(category.id), unitId, showSubUnits);
+  const count = totalArticles.filter((a) => a.status !== 'archived').length;
   const [iconHovered, setIconHovered] = useState(false);
 
-  if (articles.length === 0) return null;
+  if (totalArticles.length === 0) return null;
 
   return (
     <div className="border-b border-[#edeff3] flex flex-col">
@@ -117,46 +216,40 @@ function CategorySection({ category, collapsed, onToggle, viewMode, unitId, show
         </span>
       </div>
 
-      {/* Articles — hidden when collapsed */}
-      {!collapsed && (
-        viewMode === 'grid' ? (
-          <div className="grid grid-cols-3 gap-3 px-4 pb-4">
-            {articles.map((article) => (
-              <ArticleCard key={article.id} article={article} onClick={() => onArticleClick?.(article)} />
-            ))}
-          </div>
-        ) : (
-          <table className="w-full table-fixed">
-            <thead>
-              <tr className="border-y border-[#edeff3] bg-[#fafbfc]">
-                <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pl-4 pr-4">Article</th>
-                <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[160px]">Unit</th>
-                <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[100px]">Status</th>
-                <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[90px]">Updated</th>
-                <th className="text-left text-[12px] font-medium text-[#697a9b] py-1.5 pr-4 w-[180px]">Owner</th>
-                <th className="w-[40px] py-1.5 pr-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {articles.map((article) => (
-                <ArticleRow key={article.id} article={article} onClick={() => onArticleClick?.(article)} />
-              ))}
-            </tbody>
-          </table>
-        )
+      {!collapsed && directArticles.length > 0 && (
+        <ArticleList articles={directArticles} viewMode={viewMode} onArticleClick={onArticleClick} />
       )}
+      {subSections.map(({ category: sub, articles }) => (
+        <SubCategorySection
+          key={sub.id}
+          category={sub}
+          articles={articles}
+          collapsed={collapsedIds.has(sub.id)}
+          onToggle={() => onToggleId(sub.id)}
+          viewMode={viewMode}
+          onArticleClick={onArticleClick}
+        />
+      ))}
     </div>
   );
 }
 
-export function KBRoot({ unitId, onArticleClick, onCreateArticle }: KBRootProps) {
+export function KBRoot({ unitId, dataVersion: _dataVersion, onArticleClick, onCreateArticle }: KBRootProps) {
   const [showSubUnits, setShowSubUnits] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [selection, setSelection] = useState<SidebarSelection>('all');
 
-  const categories = getRootCategories();
+  const rootCategories = getRootCategories();
+  const visibleCategories: KBFolder[] =
+    selection === 'all'
+      ? rootCategories
+      : (() => {
+          const f = getFolder(selection.folderId);
+          return f ? [f] : [];
+        })();
 
-  const hasContent = categories.some(
+  const hasContent = rootCategories.some(
     (c) => getAllArticlesInCategory(c.id).length > 0
   );
 
@@ -173,7 +266,15 @@ export function KBRoot({ unitId, onArticleClick, onCreateArticle }: KBRootProps)
   };
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+    <div className="flex-1 flex min-h-0 overflow-hidden">
+      <KBSidebar
+        unitId={unitId}
+        showSubUnits={showSubUnits}
+        selection={selection}
+        onSelect={setSelection}
+      />
+
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-[#edeff3]">
         {/* Left side */}
@@ -274,12 +375,14 @@ export function KBRoot({ unitId, onArticleClick, onCreateArticle }: KBRootProps)
           />
         ) : (
           <>
-            {categories.map((category) => (
+            {visibleCategories.map((category) => (
               <CategorySection
                 key={category.id}
                 category={category}
                 collapsed={collapsedCategories.has(category.id)}
                 onToggle={() => toggleCategory(category.id)}
+                collapsedIds={collapsedCategories}
+                onToggleId={toggleCategory}
                 viewMode={viewMode}
                 unitId={unitId}
                 showSubUnits={showSubUnits}
@@ -288,6 +391,7 @@ export function KBRoot({ unitId, onArticleClick, onCreateArticle }: KBRootProps)
             ))}
           </>
         )}
+      </div>
       </div>
     </div>
   );

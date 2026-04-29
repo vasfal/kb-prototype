@@ -1,4 +1,4 @@
-import { Users, UserCog, Megaphone, Briefcase, BookOpen } from 'lucide-react';
+import { Users, UserCog, Megaphone, Briefcase, BookOpen, RotateCcw } from 'lucide-react';
 import type { AppTab } from '@/types';
 
 const tabs: { id: AppTab; label: string; icon: React.ElementType }[] = [
@@ -11,9 +11,10 @@ const tabs: { id: AppTab; label: string; icon: React.ElementType }[] = [
 
 interface TabBarProps {
   activeTab: AppTab;
+  onResetDemo?: () => void;
 }
 
-export function TabBar({ activeTab }: TabBarProps) {
+export function TabBar({ activeTab, onResetDemo }: TabBarProps) {
   return (
     <div className="bg-white border-b border-[#edeff3] px-4 flex items-end gap-3 shrink-0">
       {tabs.map((tab) => {
@@ -34,6 +35,16 @@ export function TabBar({ activeTab }: TabBarProps) {
           </button>
         );
       })}
+      {onResetDemo && (
+        <button
+          onClick={onResetDemo}
+          title="Reset demo data"
+          className="ml-auto mb-1.5 flex items-center gap-1.5 h-7 px-2 text-[13px] text-[#697a9b] border border-[#e0e4eb] rounded-lg hover:bg-[#fafbfc] hover:text-[#1f242e]"
+        >
+          <RotateCcw className="w-3.5 h-3.5" />
+          Reset demo
+        </button>
+      )}
     </div>
   );
 }

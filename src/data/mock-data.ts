@@ -643,3 +643,22 @@ export function getArticle(id: string): KBArticle | undefined {
 export function getFolder(id: string): KBFolder | undefined {
   return allFolders.find((f) => f.id === id);
 }
+
+// ============================================================
+// MUTATIONS (prototype only — module-local, no persistence)
+// ============================================================
+
+const initialArticlesSnapshot: KBArticle[] = allArticles.map((a) => ({ ...a }));
+
+/** Insert or replace an article by id. Mutates allArticles in place. */
+export function upsertArticle(article: KBArticle): void {
+  const idx = allArticles.findIndex((a) => a.id === article.id);
+  if (idx >= 0) allArticles[idx] = article;
+  else allArticles.push(article);
+}
+
+/** Restore allArticles to the initial demo snapshot. */
+export function resetMockData(): void {
+  allArticles.length = 0;
+  initialArticlesSnapshot.forEach((a) => allArticles.push({ ...a }));
+}

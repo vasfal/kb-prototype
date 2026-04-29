@@ -8,7 +8,13 @@ import { ArticleEditor } from '../kb/ArticleEditor';
 import { ArchiveDialog } from '../kb/ArchiveDialog';
 import { MoveDialog } from '../kb/MoveDialog';
 import type { KBArticle, ArticleStatus } from '@/types';
-import { unitTree, selectedUnitId as defaultSelectedUnitId, getUnitPath } from '@/data/mock-data';
+import {
+  unitTree,
+  selectedUnitId as defaultSelectedUnitId,
+  getUnitPath,
+  upsertArticle,
+  resetMockData,
+} from '@/data/mock-data';
 
 type ModalState =
   | { type: 'none' }
@@ -25,20 +31,20 @@ export function AppShell() {
   const [selectedUnitId, setSelectedUnitId] = useState(defaultSelectedUnitId);
   const [modal, setModal] = useState<ModalState>({ type: 'none' });
   const [dialog, setDialog] = useState<DialogState>({ type: 'none' });
-  const [, setLocalArticles] = useState<KBArticle[]>([]);
+  const [dataVersion, setDataVersion] = useState(0);
 
   const unitPath = getUnitPath(selectedUnitId).map((u) => u.name);
 
   const updateArticle = useCallback((updated: KBArticle) => {
-    setLocalArticles((prev) => {
-      const idx = prev.findIndex((a) => a.id === updated.id);
-      if (idx >= 0) {
-        const next = [...prev];
-        next[idx] = updated;
-        return next;
-      }
-      return [...prev, updated];
-    });
+    upsertArticle(updated);
+    setDataVersion((v) => v + 1);
+  }, []);
+
+  const handleResetDemo = useCallback(() => {
+    resetMockData();
+    setDataVersion((v) => v + 1);
+    setModal({ type: 'none' });
+    setDialog({ type: 'none' });
   }, []);
 
   const handleSaveArticle = useCallback((saved: KBArticle) => {
@@ -101,8 +107,9 @@ export function AppShell() {
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden bg-white">
         <TopBar unitPath={unitPath} />
-        <TabBar activeTab="kb" />
+        <TabBar activeTab="kb" onResetDemo={handleResetDemo} />
         <KBRoot
+          dataVersion={dataVersion}
           unitId={selectedUnitId}
           onArticleClick={(article) => setModal({ type: 'view', article })}
           onCreateArticle={() => setModal({ type: 'create' })}
